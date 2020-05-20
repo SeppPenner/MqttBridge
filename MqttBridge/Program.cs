@@ -1,17 +1,29 @@
-using System;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-using MQTTnet;
-using MQTTnet.Client.Options;
-using MQTTnet.Server;
-using Newtonsoft.Json;
-using Serilog;
+// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="Program.cs" company="Haemmer Electronics">
+//   Copyright (c) 2020 All rights reserved.
+// </copyright>
+// <summary>
+//   The main program.
+// </summary>
+// --------------------------------------------------------------------------------------------------------------------
 
 namespace MqttBridge
 {
+    using System;
+    using System.Diagnostics.CodeAnalysis;
+    using System.IO;
+    using System.Reflection;
+    using System.Text;
+    using System.Threading;
+
+    using MQTTnet;
+    using MQTTnet.Client.Options;
+    using MQTTnet.Server;
+
+    using Newtonsoft.Json;
+
+    using Serilog;
+
     /// <summary>
     ///     The main program.
     /// </summary>
@@ -30,6 +42,7 @@ namespace MqttBridge
 
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
+                // ReSharper disable once AssignNullToNotNullAttribute
                 .WriteTo.File(Path.Combine(currentPath,
                     @"log\MqttBridge_.txt"), rollingInterval: RollingInterval.Day)
                 .WriteTo.Console()
