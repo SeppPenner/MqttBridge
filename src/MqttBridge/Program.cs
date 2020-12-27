@@ -1,5 +1,5 @@
 // --------------------------------------------------------------------------------------------------------------------
-// <copyright file="Program.cs" company="Haemmer Electronics">
+// <copyright file="Program.cs" company="Hämmer Electronics">
 //   Copyright (c) 2020 All rights reserved.
 // </copyright>
 // <summary>
@@ -29,6 +29,11 @@ namespace MqttBridge
     /// </summary>
     public class Program
     {
+        /// <summary>
+        /// The logger.
+        /// </summary>
+        private static readonly ILogger Logger = Log.ForContext<Program>();
+
         /// <summary>
         ///     The main method that starts the service.
         /// </summary>
@@ -125,10 +130,13 @@ namespace MqttBridge
 
             var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage?.Payload);
 
-            Log.Information(
-                $"Message: ClientId = {context.ClientId}, Topic = {context.ApplicationMessage?.Topic},"
-                + $" Payload = {payload}, QoS = {context.ApplicationMessage?.QualityOfServiceLevel},"
-                + $" Retain-Flag = {context.ApplicationMessage?.Retain}");
+            Logger.Information(
+                "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
+                context.ClientId,
+                context.ApplicationMessage?.Topic,
+                payload,
+                context.ApplicationMessage?.QualityOfServiceLevel,
+                context.ApplicationMessage?.Retain);
         }
     }
 }

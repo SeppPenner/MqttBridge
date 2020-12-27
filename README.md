@@ -2,7 +2,7 @@ MqttBridge
 ====================================
 
 MqttBridge is a project to run a simple local [MQTT server](https://github.com/chkr1011/MQTTnet) from a json config file and bridge data from a local MQTT server to a remote one.
-The project was written and tested in .NetCore 3.1.
+The project was written and tested in .Net 5.0.
 
 [![Build status](https://ci.appveyor.com/api/projects/status/pmjxmlygfiyna44h?svg=true)](https://ci.appveyor.com/project/SeppPenner/mqttbridge)
 [![GitHub issues](https://img.shields.io/github/issues/SeppPenner/MqttBridge.svg)](https://github.com/SeppPenner/MqttBridge/issues)
@@ -29,4 +29,4 @@ The project was written and tested in .NetCore 3.1.
 Change history
 --------------
 
-* **Version 1.0.0.0 (2020-02-15)** : 1.0 release.
+See the [Changelog](https://github.com/SeppPenner/MqttBridge/blob/master/Changelog.md).
