@@ -11,7 +11,7 @@ The project was written and tested in .Net 5.0.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://raw.githubusercontent.com/SeppPenner/MqttBridge/master/License.txt)
 [![Known Vulnerabilities](https://snyk.io/test/github/SeppPenner/MqttBridge/badge.svg)](https://snyk.io/test/github/SeppPenner/MqttBridge)
 
-# JSON configuration (Adjust this to your needs):
+# JSON configuration (Adjust this to your needs)
 ```json
 {
   "BridgeUrl" : "mqtt.test.de",
