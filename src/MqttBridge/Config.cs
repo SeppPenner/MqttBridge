@@ -9,12 +9,9 @@
 
 namespace MqttBridge
 {
-    using System.Diagnostics.CodeAnalysis;
-
     /// <summary>
     ///     The <see cref="Config" /> read from the config.json file.
     /// </summary>
-    [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1650:ElementDocumentationMustBeSpelledCorrectly", Justification = "Reviewed. Suppression is OK here.")]
     public class Config
     {
         /// <summary>
@@ -25,7 +22,7 @@ namespace MqttBridge
         /// <summary>
         ///     Gets or sets the bridge url.
         /// </summary>
-        public string BridgeUrl { get; set; }
+        public string BridgeUrl { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets a value indicating whether SSL should be used or not.
@@ -35,6 +32,6 @@ namespace MqttBridge
         /// <summary>
         ///     Gets or sets the bridge user.
         /// </summary>
-        public User BridgeUser { get; set; }
+        public User BridgeUser { get; set; } = new();
     }
 }

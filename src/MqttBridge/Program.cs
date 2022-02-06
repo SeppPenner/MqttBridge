@@ -10,7 +10,6 @@
 namespace MqttBridge
 {
     using System;
-    using System.Diagnostics.CodeAnalysis;
     using System.IO;
     using System.Reflection;
     using System.Text;
@@ -37,23 +36,18 @@ namespace MqttBridge
         /// <summary>
         ///     The main method that starts the service.
         /// </summary>
-        [SuppressMessage(
-            "StyleCop.CSharp.DocumentationRules",
-            "SA1650:ElementDocumentationMustBeSpelledCorrectly",
-            Justification = "Reviewed. Suppression is OK here.")]
         public static void Main()
         {
-            var currentPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var currentPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
 
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                // ReSharper disable once AssignNullToNotNullAttribute
                 .WriteTo.File(Path.Combine(currentPath,
                     @"log\MqttBridge_.txt"), rollingInterval: RollingInterval.Day)
                 .WriteTo.Console()
                 .CreateLogger();
 
-            var config = ReadConfiguration(currentPath);
+            var config = ReadConfiguration(currentPath) ?? new();
 
             var optionsBuilder = new MqttServerOptionsBuilder()
                 .WithDefaultEndpoint().WithApplicationMessageInterceptor(
@@ -100,18 +94,18 @@ namespace MqttBridge
         /// </summary>
         /// <param name="currentPath">The current path.</param>
         /// <returns>A <see cref="Config" /> object.</returns>
-        private static Config ReadConfiguration(string currentPath)
+        private static Config? ReadConfiguration(string currentPath)
         {
             var filePath = $"{currentPath}\\config.json";
 
-            Config config = null;
+            Config? config = null;
 
             // ReSharper disable once InvertIf
             if (File.Exists(filePath))
             {
                 using var r = new StreamReader(filePath);
                 var json = r.ReadToEnd();
-                config = JsonConvert.DeserializeObject<Config>(json);
+                config = JsonConvert.DeserializeObject<Config?>(json);
             }
 
             return config;
@@ -128,7 +122,7 @@ namespace MqttBridge
                 return;
             }
 
-            var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage?.Payload);
+            var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
 
             Logger.Information(
                 "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
