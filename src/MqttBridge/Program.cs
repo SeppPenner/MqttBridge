@@ -7,130 +7,114 @@
 // </summary>
 // --------------------------------------------------------------------------------------------------------------------
 
-namespace MqttBridge
+namespace MqttBridge;
+
+/// <summary>
+///     The main program.
+/// </summary>
+public class Program
 {
-    using System;
-    using System.IO;
-    using System.Reflection;
-    using System.Text;
-    using System.Threading;
-
-    using MQTTnet;
-    using MQTTnet.Client.Options;
-    using MQTTnet.Server;
-
-    using Newtonsoft.Json;
-
-    using Serilog;
+    /// <summary>
+    /// The logger.
+    /// </summary>
+    private static readonly ILogger Logger = Log.ForContext<Program>();
 
     /// <summary>
-    ///     The main program.
+    ///     The main method that starts the service.
     /// </summary>
-    public class Program
+    public static void Main()
     {
-        /// <summary>
-        /// The logger.
-        /// </summary>
-        private static readonly ILogger Logger = Log.ForContext<Program>();
+        var currentPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
 
-        /// <summary>
-        ///     The main method that starts the service.
-        /// </summary>
-        public static void Main()
-        {
-            var currentPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File(Path.Combine(currentPath,
+                @"log\MqttBridge_.txt"), rollingInterval: RollingInterval.Day)
+            .WriteTo.Console()
+            .CreateLogger();
 
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.File(Path.Combine(currentPath,
-                    @"log\MqttBridge_.txt"), rollingInterval: RollingInterval.Day)
-                .WriteTo.Console()
-                .CreateLogger();
+        var config = ReadConfiguration(currentPath) ?? new();
 
-            var config = ReadConfiguration(currentPath) ?? new();
+        var optionsBuilder = new MqttServerOptionsBuilder()
+            .WithDefaultEndpoint().WithApplicationMessageInterceptor(
+                async c =>
+                {
+                    IMqttClientOptions options;
 
-            var optionsBuilder = new MqttServerOptionsBuilder()
-                .WithDefaultEndpoint().WithApplicationMessageInterceptor(
-                    async c =>
+                    if (config.UseSsl)
                     {
-                        IMqttClientOptions options;
+                        options = new MqttClientOptionsBuilder()
+                            .WithClientId(config.BridgeUser.ClientId)
+                            .WithTcpServer(config.BridgeUrl, config.BridgePort)
+                            .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
+                            .WithTls()
+                            .WithCleanSession()
+                            .Build();
+                    }
+                    else
+                    {
+                        options = new MqttClientOptionsBuilder()
+                            .WithClientId(config.BridgeUser.ClientId)
+                            .WithTcpServer(config.BridgeUrl, config.BridgePort)
+                            .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
+                            .WithCleanSession()
+                            .Build();
+                    }
 
-                        if (config.UseSsl)
-                        {
-                            options = new MqttClientOptionsBuilder()
-                                .WithClientId(config.BridgeUser.ClientId)
-                                .WithTcpServer(config.BridgeUrl, config.BridgePort)
-                                .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
-                                .WithTls()
-                                .WithCleanSession()
-                                .Build();
-                        }
-                        else
-                        {
-                            options = new MqttClientOptionsBuilder()
-                                .WithClientId(config.BridgeUser.ClientId)
-                                .WithTcpServer(config.BridgeUrl, config.BridgePort)
-                                .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
-                                .WithCleanSession()
-                                .Build();
-                        }
+                    var mqttClient = new MqttFactory().CreateMqttClient();
+                    await mqttClient.ConnectAsync(options, CancellationToken.None);
+                    await mqttClient.PublishAsync(c.ApplicationMessage, CancellationToken.None);
+                    await mqttClient.DisconnectAsync(null, CancellationToken.None);
 
-                        var mqttClient = new MqttFactory().CreateMqttClient();
-                        await mqttClient.ConnectAsync(options, CancellationToken.None);
-                        await mqttClient.PublishAsync(c.ApplicationMessage, CancellationToken.None);
-                        await mqttClient.DisconnectAsync(null, CancellationToken.None);
+                    c.AcceptPublish = true;
+                    LogMessage(c);
+                });
 
-                        c.AcceptPublish = true;
-                        LogMessage(c);
-                    });
+        var mqttServer = new MqttFactory().CreateMqttServer();
+        mqttServer.StartAsync(optionsBuilder.Build());
+        Console.ReadLine();
+    }
 
-            var mqttServer = new MqttFactory().CreateMqttServer();
-            mqttServer.StartAsync(optionsBuilder.Build());
-            Console.ReadLine();
-        }
+    /// <summary>
+    ///     Reads the configuration.
+    /// </summary>
+    /// <param name="currentPath">The current path.</param>
+    /// <returns>A <see cref="Config" /> object.</returns>
+    private static Config? ReadConfiguration(string currentPath)
+    {
+        var filePath = $"{currentPath}\\config.json";
 
-        /// <summary>
-        ///     Reads the configuration.
-        /// </summary>
-        /// <param name="currentPath">The current path.</param>
-        /// <returns>A <see cref="Config" /> object.</returns>
-        private static Config? ReadConfiguration(string currentPath)
+        Config? config = null;
+
+        if (File.Exists(filePath))
         {
-            var filePath = $"{currentPath}\\config.json";
-
-            Config? config = null;
-
-            // ReSharper disable once InvertIf
-            if (File.Exists(filePath))
-            {
-                using var r = new StreamReader(filePath);
-                var json = r.ReadToEnd();
-                config = JsonConvert.DeserializeObject<Config?>(json);
-            }
-
-            return config;
+            using var r = new StreamReader(filePath);
+            var json = r.ReadToEnd();
+            config = JsonConvert.DeserializeObject<Config?>(json);
         }
 
-        /// <summary>
-        ///     Logs the message from the MQTT message interceptor context.
-        /// </summary>
-        /// <param name="context">The MQTT message interceptor context.</param>
-        private static void LogMessage(MqttApplicationMessageInterceptorContext context)
+        return config;
+    }
+
+    /// <summary>
+    ///     Logs the message from the MQTT message interceptor context.
+    /// </summary>
+    /// <param name="context">The MQTT message interceptor context.</param>
+    private static void LogMessage(MqttApplicationMessageInterceptorContext context)
+    {
+        if (context == null)
         {
-            if (context == null)
-            {
-                return;
-            }
-
-            var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
-
-            Logger.Information(
-                "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
-                context.ClientId,
-                context.ApplicationMessage?.Topic,
-                payload,
-                context.ApplicationMessage?.QualityOfServiceLevel,
-                context.ApplicationMessage?.Retain);
+            return;
         }
+
+        var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
+
+        Logger.Information(
+            "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
+            context.ClientId,
+            context.ApplicationMessage?.Topic,
+            payload,
+            context.ApplicationMessage?.QualityOfServiceLevel,
+            context.ApplicationMessage?.Retain);
     }
 }
