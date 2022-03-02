@@ -20,6 +20,16 @@ public class Program
     private static readonly ILogger Logger = Log.ForContext<Program>();
 
     /// <summary>
+    /// The MQTT client.
+    /// </summary>
+    private static IMqttClient mqttClient = new MqttFactory().CreateMqttClient();
+
+    /// <summary>
+    /// The MQTT client options.
+    /// </summary>
+    private static IMqttClientOptions options = new MqttClientOptionsBuilder().Build();
+
+    /// <summary>
     ///     The main method that starts the service.
     /// </summary>
     public static void Main()
@@ -35,36 +45,31 @@ public class Program
 
         var config = ReadConfiguration(currentPath) ?? new();
 
+        if (config.UseSsl)
+        {
+            options = new MqttClientOptionsBuilder()
+                .WithClientId(config.BridgeUser.ClientId)
+                .WithTcpServer(config.BridgeUrl, config.BridgePort)
+                .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
+                .WithTls()
+                .WithCleanSession()
+                .Build();
+        }
+        else
+        {
+            options = new MqttClientOptionsBuilder()
+                .WithClientId(config.BridgeUser.ClientId)
+                .WithTcpServer(config.BridgeUrl, config.BridgePort)
+                .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
+                .WithCleanSession()
+                .Build();
+        }
+
         var optionsBuilder = new MqttServerOptionsBuilder()
             .WithDefaultEndpoint().WithApplicationMessageInterceptor(
                 async c =>
                 {
-                    IMqttClientOptions options;
-
-                    if (config.UseSsl)
-                    {
-                        options = new MqttClientOptionsBuilder()
-                            .WithClientId(config.BridgeUser.ClientId)
-                            .WithTcpServer(config.BridgeUrl, config.BridgePort)
-                            .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
-                            .WithTls()
-                            .WithCleanSession()
-                            .Build();
-                    }
-                    else
-                    {
-                        options = new MqttClientOptionsBuilder()
-                            .WithClientId(config.BridgeUser.ClientId)
-                            .WithTcpServer(config.BridgeUrl, config.BridgePort)
-                            .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
-                            .WithCleanSession()
-                            .Build();
-                    }
-
-                    var mqttClient = new MqttFactory().CreateMqttClient();
-                    await mqttClient.ConnectAsync(options, CancellationToken.None);
                     await mqttClient.PublishAsync(c.ApplicationMessage, CancellationToken.None);
-                    await mqttClient.DisconnectAsync(null, CancellationToken.None);
 
                     c.AcceptPublish = true;
                     LogMessage(c);
@@ -73,6 +78,14 @@ public class Program
         var mqttServer = new MqttFactory().CreateMqttServer();
         mqttServer.StartAsync(optionsBuilder.Build());
         Console.ReadLine();
+    }
+
+    /// <summary>
+    /// Connects the MQTT client.
+    /// </summary>
+    private static async Task ConnectMqttClient()
+    {
+        await mqttClient.ConnectAsync(options, CancellationToken.None);
     }
 
     /// <summary>
@@ -102,12 +115,12 @@ public class Program
     /// <param name="context">The MQTT message interceptor context.</param>
     private static void LogMessage(MqttApplicationMessageInterceptorContext context)
     {
-        if (context == null)
+        if (context is null)
         {
             return;
         }
 
-        var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
+        var payload = context.ApplicationMessage?.Payload is null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
 
         Logger.Information(
             "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
