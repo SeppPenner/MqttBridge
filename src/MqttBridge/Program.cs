@@ -1,6 +1,6 @@
 // --------------------------------------------------------------------------------------------------------------------
 // <copyright file="Program.cs" company="Hämmer Electronics">
-//   Copyright (c) 2020 All rights reserved.
+//   Copyright (c) All rights reserved.
 // </copyright>
 // <summary>
 //   The main program.
@@ -10,124 +10,118 @@
 namespace MqttBridge;
 
 /// <summary>
-///     The main program.
+/// The main program.
 /// </summary>
 public class Program
 {
     /// <summary>
-    /// The logger.
+    /// The configuration.
     /// </summary>
-    private static readonly ILogger Logger = Log.ForContext<Program>();
+    private static IConfigurationRoot? config;
 
     /// <summary>
-    /// The MQTT client.
+    /// Gets the environment name.
     /// </summary>
-    private static IMqttClient mqttClient = new MqttFactory().CreateMqttClient();
+    public static string EnvironmentName => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
 
     /// <summary>
-    /// The MQTT client options.
+    /// Gets or sets the MQTT service configuration.
     /// </summary>
-    private static IMqttClientOptions options = new MqttClientOptionsBuilder().Build();
+    public static MqttServiceConfiguration Configuration { get; set; } = new();
 
     /// <summary>
-    ///     The main method that starts the service.
+    /// The service name.
     /// </summary>
-    public static void Main()
+    public static AssemblyName ServiceName => Assembly.GetExecutingAssembly().GetName();
+
+    /// <summary>
+    /// The main method.
+    /// </summary>
+    /// <param name="args">Some arguments.</param>
+    /// <returns>The result code.</returns>
+    public static async Task<int> Main(string[] args)
     {
-        var currentPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
+        ReadConfiguration();
+        SetupLogging();
 
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
-            .WriteTo.File(Path.Combine(currentPath,
-                @"log\MqttBridge_.txt"), rollingInterval: RollingInterval.Day)
-            .WriteTo.Console()
-            .CreateLogger();
-
-        var config = ReadConfiguration(currentPath) ?? new();
-
-        if (config.UseSsl)
+        try
         {
-            options = new MqttClientOptionsBuilder()
-                .WithClientId(config.BridgeUser.ClientId)
-                .WithTcpServer(config.BridgeUrl, config.BridgePort)
-                .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
-                .WithTls()
-                .WithCleanSession()
-                .Build();
+            Log.Information("Starting {ServiceName}, Version {Version}...", ServiceName.Name, ServiceName.Version);
+            var currentLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            await CreateHostBuilder(args, currentLocation!).Build().RunAsync();
         }
-        else
+        catch (Exception ex)
         {
-            options = new MqttClientOptionsBuilder()
-                .WithClientId(config.BridgeUser.ClientId)
-                .WithTcpServer(config.BridgeUrl, config.BridgePort)
-                .WithCredentials(config.BridgeUser.UserName, config.BridgeUser.Password)
-                .WithCleanSession()
-                .Build();
+            Log.Fatal(ex, "Host terminated unexpectedly.");
+            return 1;
+        }
+        finally
+        {
+            Log.CloseAndFlush();
         }
 
-        var optionsBuilder = new MqttServerOptionsBuilder()
-            .WithDefaultEndpoint().WithApplicationMessageInterceptor(
-                async c =>
-                {
-                    await mqttClient.PublishAsync(c.ApplicationMessage, CancellationToken.None);
-
-                    c.AcceptPublish = true;
-                    LogMessage(c);
-                });
-
-        var mqttServer = new MqttFactory().CreateMqttServer();
-        mqttServer.StartAsync(optionsBuilder.Build());
-        Console.ReadLine();
+        return 0;
     }
 
     /// <summary>
-    /// Connects the MQTT client.
+    /// Creates the host builder.
     /// </summary>
-    private static async Task ConnectMqttClient()
+    /// <param name="args">The arguments.</param>
+    /// <param name="currentLocation">The current assembly location.</param>
+    /// <returns>A new <see cref="IHostBuilder"/>.</returns>
+    private static IHostBuilder CreateHostBuilder(string[] args, string currentLocation) =>
+        Host.CreateDefaultBuilder(args).ConfigureWebHostDefaults(
+                webBuilder =>
+                {;
+                    webBuilder.UseContentRoot(currentLocation);
+                    webBuilder.UseStartup<Startup>();
+                })
+            .UseSerilog()
+            .UseWindowsService()
+            .UseSystemd();
+
+    /// <summary>
+    /// Reads the configuration.
+    /// </summary>
+    private static void ReadConfiguration()
     {
-        await mqttClient.ConnectAsync(options, CancellationToken.None);
+        var configurationBuilder = new ConfigurationBuilder();
+        configurationBuilder.AddJsonFile("appsettings.json", false, true);
+
+        if (!string.IsNullOrWhiteSpace(EnvironmentName))
+        {
+            var appsettingsFileName = $"appsettings.{EnvironmentName}.json";
+
+            if (File.Exists(appsettingsFileName))
+            {
+                configurationBuilder.AddJsonFile(appsettingsFileName, false, true);
+            }
+        }
+
+        config = configurationBuilder.Build();
+        config.Bind(ServiceName.Name, Configuration);
     }
 
     /// <summary>
-    ///     Reads the configuration.
+    /// Setup the logging.
     /// </summary>
-    /// <param name="currentPath">The current path.</param>
-    /// <returns>A <see cref="Config" /> object.</returns>
-    private static Config? ReadConfiguration(string currentPath)
+    private static void SetupLogging()
     {
-        var filePath = $"{currentPath}\\config.json";
+        var loggerConfiguration = new LoggerConfiguration()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+            .Enrich.FromLogContext()
+            .Enrich.WithExceptionDetails()
+            .Enrich.WithMachineName()
+            .WriteTo.Console();
 
-        Config? config = null;
-
-        if (File.Exists(filePath))
+        if (EnvironmentName != "Development")
         {
-            using var r = new StreamReader(filePath);
-            var json = r.ReadToEnd();
-            config = JsonConvert.DeserializeObject<Config?>(json);
+            loggerConfiguration
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .MinimumLevel.Override("Orleans", LogEventLevel.Information)
+                .MinimumLevel.Information();
         }
 
-        return config;
-    }
-
-    /// <summary>
-    ///     Logs the message from the MQTT message interceptor context.
-    /// </summary>
-    /// <param name="context">The MQTT message interceptor context.</param>
-    private static void LogMessage(MqttApplicationMessageInterceptorContext context)
-    {
-        if (context is null)
-        {
-            return;
-        }
-
-        var payload = context.ApplicationMessage?.Payload is null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
-
-        Logger.Information(
-            "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
-            context.ClientId,
-            context.ApplicationMessage?.Topic,
-            payload,
-            context.ApplicationMessage?.QualityOfServiceLevel,
-            context.ApplicationMessage?.Retain);
+        Log.Logger = loggerConfiguration.CreateLogger();
     }
 }

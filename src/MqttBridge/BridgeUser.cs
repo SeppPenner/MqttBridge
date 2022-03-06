@@ -3,24 +3,19 @@
 //   Copyright (c) All rights reserved.
 // </copyright>
 // <summary>
-//   The <see cref="User" /> read from the configuration file.
+//   The <see cref="BridgeUser" /> read from the configuration file.
 // </summary>
 // --------------------------------------------------------------------------------------------------------------------
 
 namespace MqttBridge;
 
 /// <summary>
-///     The <see cref="User" /> read from the configuration file.
+///     The <see cref="BridgeUser" /> read from the configuration file.
 /// </summary>
-public class User
+public class BridgeUser : User
 {
     /// <summary>
-    ///     Gets or sets the user name.
+    /// Gets or sets the client identifier.
     /// </summary>
-    public string UserName { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the password.
-    /// </summary>
-    public string Password { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty;
 }
