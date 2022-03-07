@@ -10,10 +10,14 @@
 namespace MqttBridge;
 
 /// <inheritdoc cref="BackgroundService"/>
+/// <inheritdoc cref="IMqttServerSubscriptionInterceptor"/>
+/// <inheritdoc cref="IMqttServerApplicationMessageInterceptor"/>
+/// <inheritdoc cref="IMqttServerConnectionValidator"/>
+/// <inheritdoc cref="IMqttServerClientDisconnectedHandler"/>
 /// <summary>
 ///     The main service class of the <see cref="MqttService" />.
 /// </summary>
-public class MqttService : BackgroundService
+public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor, IMqttServerApplicationMessageInterceptor, IMqttServerConnectionValidator, IMqttServerClientDisconnectedHandler
 {
     /// <summary>
     /// The logger.
@@ -33,17 +37,22 @@ public class MqttService : BackgroundService
     /// <summary>
     /// The MQTT client.
     /// </summary>
-    private IMqttClient mqttClient = new MqttFactory().CreateMqttClient();
+    private IMqttClient? mqttClient;
 
     /// <summary>
     /// The MQTT client options.
     /// </summary>
-    private IMqttClientOptions clientOptions = new MqttClientOptionsBuilder().Build();
+    private IMqttClientOptions? clientOptions;
 
     /// <summary>
     /// The cancellation token.
     /// </summary>
     private CancellationToken cancellationToken;
+
+    /// <summary>
+    /// The retry attempts counter.
+    /// </summary>
+    private int retryAttempts;
 
     /// <summary>
     /// Gets or sets the MQTT service configuration.
@@ -103,6 +112,111 @@ public class MqttService : BackgroundService
     }
 
     /// <summary>
+    /// Validates the MQTT connection.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
+    public Task ValidateConnectionAsync(MqttConnectionValidatorContext context)
+    {
+        try
+        {
+            var currentUser = this.MqttServiceConfiguration.Users.FirstOrDefault(u => u.UserName == context.Username);
+
+            if (currentUser == null)
+            {
+                context.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                this.LogMessage(context, true);
+                return Task.CompletedTask;
+            }
+
+            if (context.Username != currentUser.UserName)
+            {
+                context.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                this.LogMessage(context, true);
+                return Task.CompletedTask;
+            }
+
+            if (context.Password != currentUser.Password)
+            {
+                context.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                this.LogMessage(context, true);
+                return Task.CompletedTask;
+            }
+
+            context.ReasonCode = MqttConnectReasonCode.Success;
+            this.LogMessage(context, false);
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            this.logger.Error("An error occurred: {@ex}.", ex);
+            return Task.FromException(ex);
+        }
+    }
+
+    /// <summary>
+    /// Validates the MQTT subscriptions.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
+    public Task InterceptSubscriptionAsync(MqttSubscriptionInterceptorContext context)
+    {
+        try
+        {
+            context.AcceptSubscription = true;
+            this.LogMessage(context, true);
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            this.logger.Error("An error occurred: {@ex}.", ex);
+            return Task.FromException(ex);
+        }
+    }
+
+    /// <summary>
+    /// Validates the MQTT application messages.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
+    public async Task InterceptApplicationMessagePublishAsync(MqttApplicationMessageInterceptorContext context)
+    {
+        try
+        {
+            context.AcceptPublish = true;
+            await this.mqttClient!.PublishAsync(context.ApplicationMessage, this.cancellationToken);
+            this.LogMessage(context);
+        }
+        catch (Exception ex)
+        {
+            this.logger.Error("An error occurred: {@ex}.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Validates the MQTT client disconnect.
+    /// </summary>
+    /// <param name="eventArgs">The event args.</param>
+    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
+    public async Task HandleClientDisconnectedAsync(MqttServerClientDisconnectedEventArgs eventArgs)
+    {
+        try
+        {
+            var seconds = Math.Pow(2, this.retryAttempts);
+            var maxSeconds = Math.Max(seconds, 60);
+            var timeToWait = TimeSpan.FromSeconds(maxSeconds);
+            await Task.Delay(timeToWait, this.cancellationToken);
+            await this.mqttClient!.ConnectAsync(this.clientOptions, this.cancellationToken);
+            this.retryAttempts = 0;
+        }
+        catch (Exception ex)
+        {
+            this.retryAttempts++;
+            this.logger.Error("An error occurred: {@ex}.", ex);
+        }
+    }
+
+    /// <summary>
     /// Starts the MQTT client.
     /// </summary>
     private async Task StartMqttClient()
@@ -127,9 +241,8 @@ public class MqttService : BackgroundService
                 .Build();
         }
 
-        await this.mqttClient.ConnectAsync(this.clientOptions, this.cancellationToken);
-
-        // Todo: Add reconnect.
+        this.mqttClient = new MqttFactory().CreateMqttClient();
+        await this.mqttClient!.ConnectAsync(this.clientOptions, this.cancellationToken);
     }
 
     /// <summary>
@@ -137,51 +250,13 @@ public class MqttService : BackgroundService
     /// </summary>
     private void StartMqttServer()
     {
-        // Todo: Move check and interceptor code to methods.
         var optionsBuilder = new MqttServerOptionsBuilder()
             .WithDefaultEndpoint()
             .WithDefaultEndpointPort(this.MqttServiceConfiguration.Port)
             .WithEncryptedEndpointPort(this.MqttServiceConfiguration.TlsPort)
-            .WithConnectionValidator(
-                c =>
-                {
-                    var currentUser = this.MqttServiceConfiguration.Users.FirstOrDefault(u => u.UserName == c.Username);
-
-                    if (currentUser == null)
-                    {
-                        c.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                        this.LogMessage(c, true);
-                        return;
-                    }
-
-                    if (c.Username != currentUser.UserName)
-                    {
-                        c.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                        this.LogMessage(c, true);
-                        return;
-                    }
-
-                    if (c.Password != currentUser.Password)
-                    {
-                        c.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                        this.LogMessage(c, true);
-                        return;
-                    }
-
-                    c.ReasonCode = MqttConnectReasonCode.Success;
-                    this.LogMessage(c, false);
-                }).WithSubscriptionInterceptor(
-                c =>
-                {
-                    c.AcceptSubscription = true;
-                    this.LogMessage(c, true);
-                }).WithApplicationMessageInterceptor(
-                c =>
-                {
-                    c.AcceptPublish = true;
-                    await this.mqttClient.PublishAsync(c.ApplicationMessage, this.cancellationToken);
-                    this.LogMessage(c);
-                });
+            .WithConnectionValidator(this)
+            .WithSubscriptionInterceptor(this)
+            .WithApplicationMessageInterceptor(this);
 
         var mqttServer = new MqttFactory().CreateMqttServer();
         mqttServer.StartAsync(optionsBuilder.Build());
