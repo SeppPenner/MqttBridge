@@ -12,15 +12,15 @@ MqttBridge is a project to run a simple local [MQTT server](https://github.com/c
 
 Docker:
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/sepppenner/mqttbride)](https://hub.docker.com/repository/docker/sepppenner/mqttbride)
-[![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/sepppenner/mqttbride?sort=date)](https://hub.docker.com/repository/docker/sepppenner/mqttbride)
-[![Docker Stars](https://img.shields.io/docker/stars/sepppenner/mqttbride)](https://hub.docker.com/repository/docker/sepppenner/mqttbride)
+[![Docker Pulls](https://img.shields.io/docker/pulls/sepppenner/mqttbridge)](https://hub.docker.com/repository/docker/sepppenner/mqttbridge)
+[![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/sepppenner/mqttbridge?sort=date)](https://hub.docker.com/repository/docker/sepppenner/mqttbridge)
+[![Docker Stars](https://img.shields.io/docker/stars/sepppenner/mqttbridge)](https://hub.docker.com/repository/docker/sepppenner/mqttbridge)
 
 Docker (ARM):
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/sepppenner/mqttbride-arm)](https://hub.docker.com/repository/docker/sepppenner/mqttbride-arm)
-[![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/sepppenner/mqttbride-arm?sort=date)](https://hub.docker.com/repository/docker/sepppenner/mqttbride-arm)
-[![Docker Stars](https://img.shields.io/docker/stars/sepppenner/mqttbride-arm)](https://hub.docker.com/repository/docker/sepppenner/mqttbride-arm)
+[![Docker Pulls](https://img.shields.io/docker/pulls/sepppenner/mqttbridge-arm)](https://hub.docker.com/repository/docker/sepppenner/mqttbridge-arm)
+[![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/sepppenner/mqttbridge-arm?sort=date)](https://hub.docker.com/repository/docker/sepppenner/mqttbridge-arm)
+[![Docker Stars](https://img.shields.io/docker/stars/sepppenner/mqttbridge-arm)](https://hub.docker.com/repository/docker/sepppenner/mqttbridge-arm)
 
 # JSON configuration (Adjust this to your needs)
 ```json
@@ -63,31 +63,31 @@ Docker (ARM):
     ```
 
 3. Build the docker file:
-    * `dockerhubuser` is a placeholder for your docker hub username, if you want to build locally, just name the container `mqttbride`
+    * `dockerhubuser` is a placeholder for your docker hub username, if you want to build locally, just name the container `mqttbridge`
     * `1.0.2` is an example version tag, use it as you like
     * `-f Dockerfile .` (Mind the `.`) is used to specify the dockerfile to use
 
     ```bash
-    docker build --tag dockerhubuser/mqttbride:1.0.2 -f Dockerfile .
+    docker build --tag dockerhubuser/mqttbridge:1.0.2 -f Dockerfile .
     ```
 
 4. Push the project to docker hub (If you like)
-    * `dockerhubuser` is a placeholder for your docker hub username, if you want to build locally, just name the container `mqttbride`
+    * `dockerhubuser` is a placeholder for your docker hub username, if you want to build locally, just name the container `mqttbridge`
     * `1.0.2` is an example version tag, use it as you like
 
     ```bash
-    docker push dockerhubuser/mqttbride:1.0.2
+    docker push dockerhubuser/mqttbridge:1.0.2
     ```
 
 5. Run the container:
     * `-d` runs the docker container detached (e.g. no logs shown on the console, is needed if run as service)
-    * `--name="mqttbride"` gives the container a certain name
+    * `--name="mqttbridge"` gives the container a certain name
     * `-p 1883:1883` opens the internal container port 1883 (Default MQTT without TLS) to the external port 1883
     * `-p 8883:8883` opens the internal container port 8883 (Default MQTT with TLS) to the external port 8883
     * `-v "/home/config.json:/app/appsettings.json"` sets the path to the external configuration file (In the example located under `/home/appsettings.json`) to the container internally
     
     ```bash
-    docker run -d --name="mqttbride" -p 1883:1883 -p 8883:8883 -v "/home/appsettings.json:/app/appsettings.json" --restart=always dockerhubuser/mqttbride:1.0.2
+    docker run -d --name="mqttbridge" -p 1883:1883 -p 8883:8883 -v "/home/appsettings.json:/app/appsettings.json" --restart=always dockerhubuser/mqttbridge:1.0.2
     ```
 
 6. Check the status of all containers running (Must be root)
