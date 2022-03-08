@@ -25,7 +25,6 @@ Docker (ARM):
 ## Basic usage
 Check out the how to use file [here](https://github.com/SeppPenner/MqttBridge/blob/master/HowToUse.md).
 
-
 Change history
 --------------
 

@@ -1,6 +1,5 @@
 ## Basic usage
 
-
 ### JSON configuration (Adjust this to your needs)
 ```json
 {
