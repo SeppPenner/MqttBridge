@@ -115,7 +115,6 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// Validates the MQTT connection.
     /// </summary>
     /// <param name="context">The context.</param>
-    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
     public Task ValidateConnectionAsync(MqttConnectionValidatorContext context)
     {
         try
@@ -149,7 +148,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         }
         catch (Exception ex)
         {
-            this.logger.Error("An error occurred: {@ex}.", ex);
+            this.logger.Error("An error occurred: {Exception}.", ex);
             return Task.FromException(ex);
         }
     }
@@ -158,7 +157,6 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// Validates the MQTT subscriptions.
     /// </summary>
     /// <param name="context">The context.</param>
-    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
     public Task InterceptSubscriptionAsync(MqttSubscriptionInterceptorContext context)
     {
         try
@@ -169,7 +167,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         }
         catch (Exception ex)
         {
-            this.logger.Error("An error occurred: {@ex}.", ex);
+            this.logger.Error("An error occurred: {Exception}.", ex);
             return Task.FromException(ex);
         }
     }
@@ -178,7 +176,6 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// Validates the MQTT application messages.
     /// </summary>
     /// <param name="context">The context.</param>
-    /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
     public async Task InterceptApplicationMessagePublishAsync(MqttApplicationMessageInterceptorContext context)
     {
         try
@@ -189,7 +186,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         }
         catch (Exception ex)
         {
-            this.logger.Error("An error occurred: {@ex}.", ex);
+            this.logger.Error("An error occurred: {Exception}.", ex);
         }
     }
 
@@ -212,7 +209,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         catch (Exception ex)
         {
             this.retryAttempts++;
-            this.logger.Error("An error occurred: {@ex}.", ex);
+            this.logger.Error("An error occurred: {Exception}.", ex);
         }
     }
 
@@ -271,8 +268,8 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     {
         this.logger.Information(
             successful
-                ? "New subscription: ClientId = {clientId}, TopicFilter = {topicFilter}"
-                : "Subscription failed for clientId = {clientId}, TopicFilter = {topicFilter}",
+                ? "New subscription: ClientId = {ClientId}, TopicFilter = {TopicFilter}"
+                : "Subscription failed for clientId = {clientId}, TopicFilter = {TopicFilter}",
             context.ClientId,
             context.TopicFilter);
     }
@@ -286,7 +283,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
 
         this.logger.Information(
-            "Message: ClientId = {clientId}, Topic = {topic}, Payload = {payload}, QoS = {qos}, Retain-Flag = {retainFlag}",
+            "Message: ClientId = {ClientId}, Topic = {Topic}, Payload = {Payload}, QoS = {Qos}, Retain-Flag = {RetainFlag}",
             context.ClientId,
             context.ApplicationMessage?.Topic,
             payload,
@@ -304,7 +301,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         if (showPassword)
         {
             this.logger.Information(
-                "New connection: ClientId = {clientId}, Endpoint = {endpoint}, Username = {userName}, Password = {password}, CleanSession = {cleanSession}",
+                "New connection: ClientId = {ClientId}, Endpoint = {Endpoint}, Username = {UserName}, Password = {Password}, CleanSession = {CleanSession}",
                 context.ClientId,
                 context.Endpoint,
                 context.Username,
@@ -314,7 +311,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         else
         {
             this.logger.Information(
-                "New connection: ClientId = {clientId}, Endpoint = {endpoint}, Username = {userName}, CleanSession = {cleanSession}",
+                "New connection: ClientId = {ClientId}, Endpoint = {Endpoint}, Username = {UserName}, CleanSession = {CleanSession}",
                 context.ClientId,
                 context.Endpoint,
                 context.Username,
