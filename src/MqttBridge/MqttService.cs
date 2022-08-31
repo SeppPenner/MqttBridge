@@ -10,14 +10,10 @@
 namespace MqttBridge;
 
 /// <inheritdoc cref="BackgroundService"/>
-/// <inheritdoc cref="IMqttServerSubscriptionInterceptor"/>
-/// <inheritdoc cref="IMqttServerApplicationMessageInterceptor"/>
-/// <inheritdoc cref="IMqttServerConnectionValidator"/>
-/// <inheritdoc cref="IMqttServerClientDisconnectedHandler"/>
 /// <summary>
 ///     The main service class of the <see cref="MqttService" />.
 /// </summary>
-public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor, IMqttServerApplicationMessageInterceptor, IMqttServerConnectionValidator, IMqttServerClientDisconnectedHandler
+public class MqttService : BackgroundService
 {
     /// <summary>
     /// The logger.
@@ -42,7 +38,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// <summary>
     /// The MQTT client options.
     /// </summary>
-    private IMqttClientOptions? clientOptions;
+    private MqttClientOptions? clientOptions;
 
     /// <summary>
     /// The cancellation token.
@@ -114,36 +110,36 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// <summary>
     /// Validates the MQTT connection.
     /// </summary>
-    /// <param name="context">The context.</param>
-    public Task ValidateConnectionAsync(MqttConnectionValidatorContext context)
+    /// <param name="args">The arguments.</param>
+    public Task ValidateConnectionAsync(ValidatingConnectionEventArgs args)
     {
         try
         {
-            var currentUser = this.MqttServiceConfiguration.Users.FirstOrDefault(u => u.UserName == context.Username);
+            var currentUser = this.MqttServiceConfiguration.Users.FirstOrDefault(u => u.UserName == args.UserName);
 
             if (currentUser == null)
             {
-                context.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                this.LogMessage(context, true);
+                args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                this.LogMessage(args, true);
                 return Task.CompletedTask;
             }
 
-            if (context.Username != currentUser.UserName)
+            if (args.UserName != currentUser.UserName)
             {
-                context.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                this.LogMessage(context, true);
+                args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                this.LogMessage(args, true);
                 return Task.CompletedTask;
             }
 
-            if (context.Password != currentUser.Password)
+            if (args.Password != currentUser.Password)
             {
-                context.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
-                this.LogMessage(context, true);
+                args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                this.LogMessage(args, true);
                 return Task.CompletedTask;
             }
 
-            context.ReasonCode = MqttConnectReasonCode.Success;
-            this.LogMessage(context, false);
+            args.ReasonCode = MqttConnectReasonCode.Success;
+            this.LogMessage(args, false);
             return Task.CompletedTask;
         }
         catch (Exception ex)
@@ -156,13 +152,13 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// <summary>
     /// Validates the MQTT subscriptions.
     /// </summary>
-    /// <param name="context">The context.</param>
-    public Task InterceptSubscriptionAsync(MqttSubscriptionInterceptorContext context)
+    /// <param name="args">The arguments.</param>
+    public Task InterceptSubscriptionAsync(InterceptingSubscriptionEventArgs args)
     {
         try
         {
-            context.AcceptSubscription = true;
-            this.LogMessage(context, true);
+            args.ProcessSubscription = true;
+            this.LogMessage(args, true);
             return Task.CompletedTask;
         }
         catch (Exception ex)
@@ -175,14 +171,14 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// <summary>
     /// Validates the MQTT application messages.
     /// </summary>
-    /// <param name="context">The context.</param>
-    public async Task InterceptApplicationMessagePublishAsync(MqttApplicationMessageInterceptorContext context)
+    /// <param name="args">The arguments.</param>
+    public async Task InterceptApplicationMessagePublishAsync(InterceptingPublishEventArgs args)
     {
         try
         {
-            context.AcceptPublish = true;
-            await this.mqttClient!.PublishAsync(context.ApplicationMessage, this.cancellationToken);
-            this.LogMessage(context);
+            args.ProcessPublish = true;
+            await this.mqttClient!.PublishAsync(args.ApplicationMessage, this.cancellationToken);
+            this.LogMessage(args);
         }
         catch (Exception ex)
         {
@@ -193,9 +189,9 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// <summary>
     /// Validates the MQTT client disconnect.
     /// </summary>
-    /// <param name="eventArgs">The event args.</param>
+    /// <param name="args">The arguments.</param>
     /// <returns>A <see cref="Task"/> representing any asynchronous operation.</returns>
-    public async Task HandleClientDisconnectedAsync(MqttServerClientDisconnectedEventArgs eventArgs)
+    public async Task HandleClientDisconnectedAsync(ClientDisconnectedEventArgs args)
     {
         try
         {
@@ -250,45 +246,46 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
         var optionsBuilder = new MqttServerOptionsBuilder()
             .WithDefaultEndpoint()
             .WithDefaultEndpointPort(this.MqttServiceConfiguration.Port)
-            .WithEncryptedEndpointPort(this.MqttServiceConfiguration.TlsPort)
-            .WithConnectionValidator(this)
-            .WithSubscriptionInterceptor(this)
-            .WithApplicationMessageInterceptor(this);
+            .WithEncryptedEndpointPort(this.MqttServiceConfiguration.TlsPort);
 
-        var mqttServer = new MqttFactory().CreateMqttServer();
-        mqttServer.StartAsync(optionsBuilder.Build());
+        var mqttServer = new MqttFactory().CreateMqttServer(optionsBuilder.Build());
+        mqttServer.ValidatingConnectionAsync += this.ValidateConnectionAsync;
+        mqttServer.InterceptingSubscriptionAsync += this.InterceptSubscriptionAsync;
+        mqttServer.InterceptingPublishAsync += this.InterceptApplicationMessagePublishAsync;
+        mqttServer.ClientDisconnectedAsync += this.HandleClientDisconnectedAsync;
+        mqttServer.StartAsync();
     }
 
     /// <summary> 
     ///     Logs the message from the MQTT subscription interceptor context. 
     /// </summary> 
-    /// <param name="context">The MQTT subscription interceptor context.</param> 
+    /// <param name="args">The arguments.</param> 
     /// <param name="successful">A <see cref="bool"/> value indicating whether the subscription was successful or not.</param> 
-    private void LogMessage(MqttSubscriptionInterceptorContext context, bool successful)
+    private void LogMessage(InterceptingSubscriptionEventArgs args, bool successful)
     {
         this.logger.Information(
             successful
                 ? "New subscription: ClientId = {ClientId}, TopicFilter = {TopicFilter}"
                 : "Subscription failed for clientId = {clientId}, TopicFilter = {TopicFilter}",
-            context.ClientId,
-            context.TopicFilter);
+            args.ClientId,
+            args.TopicFilter);
     }
 
     /// <summary>
     ///     Logs the message from the MQTT message interceptor context.
     /// </summary>
-    /// <param name="context">The MQTT message interceptor context.</param>
-    private void LogMessage(MqttApplicationMessageInterceptorContext context)
+    /// <param name="args">The arguments.</param>
+    private void LogMessage(InterceptingPublishEventArgs args)
     {
-        var payload = context.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(context.ApplicationMessage.Payload);
+        var payload = args.ApplicationMessage?.Payload == null ? null : Encoding.UTF8.GetString(args.ApplicationMessage.Payload);
 
         this.logger.Information(
             "Message: ClientId = {ClientId}, Topic = {Topic}, Payload = {Payload}, QoS = {Qos}, Retain-Flag = {RetainFlag}",
-            context.ClientId,
-            context.ApplicationMessage?.Topic,
+            args.ClientId,
+            args.ApplicationMessage?.Topic,
             payload,
-            context.ApplicationMessage?.QualityOfServiceLevel,
-            context.ApplicationMessage?.Retain);
+            args.ApplicationMessage?.QualityOfServiceLevel,
+            args.ApplicationMessage?.Retain);
     }
 
     /// <summary> 
@@ -296,7 +293,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
     /// </summary> 
     /// <param name="context">The MQTT connection validation context.</param> 
     /// <param name="showPassword">A <see cref="bool"/> value indicating whether the password is written to the log or not.</param> 
-    private void LogMessage(MqttConnectionValidatorContext context, bool showPassword)
+    private void LogMessage(ValidatingConnectionEventArgs context, bool showPassword)
     {
         if (showPassword)
         {
@@ -304,7 +301,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
                 "New connection: ClientId = {ClientId}, Endpoint = {Endpoint}, Username = {UserName}, Password = {Password}, CleanSession = {CleanSession}",
                 context.ClientId,
                 context.Endpoint,
-                context.Username,
+                context.UserName,
                 context.Password,
                 context.CleanSession);
         }
@@ -314,7 +311,7 @@ public class MqttService : BackgroundService, IMqttServerSubscriptionInterceptor
                 "New connection: ClientId = {ClientId}, Endpoint = {Endpoint}, Username = {UserName}, CleanSession = {CleanSession}",
                 context.ClientId,
                 context.Endpoint,
-                context.Username,
+                context.UserName,
                 context.CleanSession);
         }
     }
