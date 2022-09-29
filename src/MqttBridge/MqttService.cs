@@ -9,6 +9,8 @@
 
 namespace MqttBridge;
 
+using Serilog.Core;
+
 /// <inheritdoc cref="BackgroundService"/>
 /// <summary>
 ///     The main service class of the <see cref="MqttService" />.
@@ -63,8 +65,12 @@ public class MqttService : BackgroundService
     public MqttService(MqttServiceConfiguration mqttServiceConfiguration, string serviceName)
     {
         this.MqttServiceConfiguration = mqttServiceConfiguration;
-        this.logger = Log.ForContext("Type", nameof(MqttService));
         this.serviceName = serviceName;
+
+        // Create the logger.
+        this.logger = LoggerConfig.GetLoggerConfiguration(nameof(MqttService))
+            .WriteTo.Sink((ILogEventSink)Log.Logger)
+            .CreateLogger();
     }
 
     /// <inheritdoc cref="BackgroundService"/>
@@ -263,12 +269,14 @@ public class MqttService : BackgroundService
     /// <param name="successful">A <see cref="bool"/> value indicating whether the subscription was successful or not.</param> 
     private void LogMessage(InterceptingSubscriptionEventArgs args, bool successful)
     {
+#pragma warning disable Serilog004 // Constant MessageTemplate verifier
         this.logger.Information(
             successful
                 ? "New subscription: ClientId = {ClientId}, TopicFilter = {TopicFilter}"
                 : "Subscription failed for clientId = {clientId}, TopicFilter = {TopicFilter}",
             args.ClientId,
             args.TopicFilter);
+#pragma warning restore Serilog004 // Constant MessageTemplate verifier
     }
 
     /// <summary>
