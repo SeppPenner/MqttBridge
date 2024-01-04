@@ -9,6 +9,9 @@ MqttBridge is a project to run a simple local [MQTT server](https://github.com/c
 [![GitHub stars](https://img.shields.io/github/stars/SeppPenner/MqttBridge.svg)](https://github.com/SeppPenner/MqttBridge/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://raw.githubusercontent.com/SeppPenner/MqttBridge/master/License.txt)
 [![Known Vulnerabilities](https://snyk.io/test/github/SeppPenner/MqttBridge/badge.svg)](https://snyk.io/test/github/SeppPenner/MqttBridge)
+[![Blogger](https://img.shields.io/badge/Follow_me_on-blogger-orange)](https://franzhuber23.blogspot.de/)
+[![Patreon](https://img.shields.io/badge/Patreon-F96854?logo=patreon&logoColor=white)](https://patreon.com/SeppPennerOpenSourceDevelopment)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?logo=paypal&logoColor=white)](https://paypal.me/th070795)
 
 Docker:
 
