@@ -30,7 +30,7 @@ public class Startup
     /// <param name="configuration">The configuration.</param>
     public Startup(IConfiguration configuration)
     {
-        configuration.GetSection(this.serviceName.Name).Bind(this.mqttServiceConfiguration);
+        configuration.GetSection(this.serviceName.Name ?? "MqttBridge").Bind(this.mqttServiceConfiguration);
     }
 
     /// <summary>
