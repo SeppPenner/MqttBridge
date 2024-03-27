@@ -76,7 +76,7 @@ public class Program
                     webBuilder.UseContentRoot(currentLocation);
                     webBuilder.UseStartup<Startup>();
                 })
-            .UseSerilog()+
+            .UseSerilog()
             .UseWindowsService()
             .UseSystemd();
 
