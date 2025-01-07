@@ -12,7 +12,7 @@ namespace MqttBridge;
 /// <summary>
 /// The main program.
 /// </summary>
-public class Program
+public sealed class Program
 {
     /// <summary>
     /// The configuration.

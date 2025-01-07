@@ -9,13 +9,11 @@
 
 namespace MqttBridge;
 
-using Serilog.Core;
-
 /// <inheritdoc cref="BackgroundService"/>
 /// <summary>
 ///     The main service class of the <see cref="MqttService" />.
 /// </summary>
-public class MqttService : BackgroundService
+public sealed class MqttService : BackgroundService
 {
     /// <summary>
     /// The logger.
@@ -231,6 +229,7 @@ public class MqttService : BackgroundService
                     UseTls = true
                 })
                 .WithCleanSession()
+                .WithProtocolVersion(MqttProtocolVersion.V311)
                 .Build();
         }
         else
@@ -240,10 +239,11 @@ public class MqttService : BackgroundService
                 .WithTcpServer(this.MqttServiceConfiguration.BridgeUrl, this.MqttServiceConfiguration.BridgePort)
                 .WithCredentials(this.MqttServiceConfiguration.BridgeUser.UserName, this.MqttServiceConfiguration.BridgeUser.Password)
                 .WithCleanSession()
+                .WithProtocolVersion(MqttProtocolVersion.V311)
                 .Build();
         }
 
-        this.mqttClient = new MqttFactory().CreateMqttClient();
+        this.mqttClient = new MqttClientFactory().CreateMqttClient();
         await this.mqttClient!.ConnectAsync(this.clientOptions, this.cancellationToken);
     }
 
@@ -257,7 +257,7 @@ public class MqttService : BackgroundService
             .WithDefaultEndpointPort(this.MqttServiceConfiguration.Port)
             .WithEncryptedEndpointPort(this.MqttServiceConfiguration.TlsPort);
 
-        var mqttServer = new MqttFactory().CreateMqttServer(optionsBuilder.Build());
+        var mqttServer = new MqttServerFactory().CreateMqttServer(optionsBuilder.Build());
         mqttServer.ValidatingConnectionAsync += this.ValidateConnectionAsync;
         mqttServer.InterceptingSubscriptionAsync += this.InterceptSubscriptionAsync;
         mqttServer.InterceptingPublishAsync += this.InterceptApplicationMessagePublishAsync;
@@ -288,7 +288,7 @@ public class MqttService : BackgroundService
     /// <param name="args">The arguments.</param>
     private void LogMessage(InterceptingPublishEventArgs args)
     {
-        var payload = args.ApplicationMessage?.PayloadSegment is null ? null : Encoding.UTF8.GetString(args.ApplicationMessage.PayloadSegment);
+        var payload = Encoding.UTF8.GetString(args.ApplicationMessage.Payload);
 
         this.logger.Information(
             "Message: ClientId = {ClientId}, Topic = {Topic}, Payload = {Payload}, QoS = {Qos}, Retain-Flag = {RetainFlag}",
@@ -309,9 +309,9 @@ public class MqttService : BackgroundService
         if (showPassword)
         {
             this.logger.Information(
-                "New connection: ClientId = {ClientId}, Endpoint = {Endpoint}, Username = {UserName}, Password = {Password}, CleanSession = {CleanSession}",
+                "New connection: ClientId = {ClientId}, Endpoint = {@Endpoint}, Username = {UserName}, Password = {Password}, CleanSession = {CleanSession}",
                 context.ClientId,
-                context.Endpoint,
+                context.RemoteEndPoint,
                 context.UserName,
                 context.Password,
                 context.CleanSession);
@@ -319,9 +319,9 @@ public class MqttService : BackgroundService
         else
         {
             this.logger.Information(
-                "New connection: ClientId = {ClientId}, Endpoint = {Endpoint}, Username = {UserName}, CleanSession = {CleanSession}",
+                "New connection: ClientId = {ClientId}, Endpoint = {@Endpoint}, Username = {UserName}, CleanSession = {CleanSession}",
                 context.ClientId,
-                context.Endpoint,
+                context.RemoteEndPoint,
                 context.UserName,
                 context.CleanSession);
         }

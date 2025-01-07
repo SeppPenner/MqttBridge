@@ -12,7 +12,7 @@ namespace MqttBridge;
 /// <summary>
 ///     The <see cref="BridgeUser" /> read from the configuration file.
 /// </summary>
-public class BridgeUser : User
+public sealed class BridgeUser : User
 {
     /// <summary>
     /// Gets or sets the client identifier.

@@ -12,7 +12,7 @@ namespace MqttBridge;
 /// <summary>
 /// The startup class.
 /// </summary>
-public class Startup
+public sealed class Startup
 {
     /// <summary>
     /// The service name.
